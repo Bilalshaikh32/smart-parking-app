@@ -1,0 +1,33 @@
+# Ignore local copy of Flutter SDK if present in the workspace
+flutter/
+
+# Ignore local build artifacts and temporary files
+releases/
+*.apk
+*.zip
+
+# Ignore Dart/Flutter tool files
+**/.dart_tool/
+**/.pub/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Ignore generated build folders and artifacts
+**/build/
+releases/
+*.apk
+*.zip
+
+# Ignore Android local properties and Gradle caches
+**/local.properties
+**/.gradle/
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+
+# Ignore IDE files
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
