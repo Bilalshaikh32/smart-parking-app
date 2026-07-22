@@ -1,0 +1,41 @@
+name: smart_parking_system
+description: "Smart Parking System - Live IoT dashboard for Arduino Uno + HC-05 parking system"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Bluetooth Classic (HC-05 / HC-06) communication.
+  # NOTE: the original `flutter_bluetooth_serial` package's pubspec caps its
+  # supported SDK at "<3.0.0", which makes `flutter pub get` fail outright
+  # on any current Flutter install (Dart 3.x). Its Android module also has
+  # no `namespace`, which breaks the build under AGP 8+. This actively
+  # maintained fork has the same API but fixes both problems.
+  flutter_bluetooth_serial_plus: ^0.5.3
+
+  # State management
+  provider: ^6.1.2
+
+  # Smooth premium animations (splash, slot flip, fades)
+  flutter_animate: ^4.5.0
+
+  # Permission handling for Bluetooth on Android 12+
+  permission_handler: ^11.3.1
+
+  # Remembers the last-connected HC-05 so the app can auto-reconnect
+  shared_preferences: ^2.3.2
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
