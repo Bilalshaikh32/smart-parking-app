@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../models/parking_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
@@ -7,16 +8,22 @@ class ParkingSummaryCard extends StatelessWidget {
   final int total;
   final int available;
   final int occupied;
+  final int? reportedAvailable;
+  final int? reportedOccupied;
   final bool isFull;
   final bool hasLiveData;
+  final TrafficLightState lightState;
 
   const ParkingSummaryCard({
     super.key,
     required this.total,
     required this.available,
     required this.occupied,
+    required this.reportedAvailable,
+    required this.reportedOccupied,
     required this.isFull,
     required this.hasLiveData,
+    this.lightState = TrafficLightState.unknown,
   });
 
   @override
@@ -55,9 +62,53 @@ class ParkingSummaryCard extends StatelessWidget {
             Text('No valid parking data has been received yet.',
                 style: AppTheme.mono(size: 10, color: AppColors.mutedForeground)),
           ],
+          if (hasLiveData && reportedAvailable != null && reportedOccupied != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Arduino reported: $reportedAvailable available · $reportedOccupied occupied',
+              style: AppTheme.mono(size: 10, color: AppColors.mutedForeground),
+            ),
+          ],
+          const SizedBox(height: 16),
+          _LightIndicator(state: lightState),
         ],
       ),
     ).animate().fadeIn(duration: 350.ms, delay: 60.ms);
+  }
+}
+
+class _LightIndicator extends StatelessWidget {
+  final TrafficLightState state;
+  const _LightIndicator({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (state) {
+      TrafficLightState.green => 'GREEN',
+      TrafficLightState.yellow => 'YELLOW',
+      TrafficLightState.red => 'RED',
+      TrafficLightState.unknown => 'UNKNOWN',
+    };
+    final color = switch (state) {
+      TrafficLightState.green => AppColors.available,
+      TrafficLightState.yellow => AppColors.checking,
+      TrafficLightState.red => AppColors.occupied,
+      TrafficLightState.unknown => AppColors.unknown,
+    };
+    final icon = switch (state) {
+      TrafficLightState.green => Icons.circle,
+      TrafficLightState.yellow => Icons.circle,
+      TrafficLightState.red => Icons.circle,
+      TrafficLightState.unknown => Icons.help_outline_rounded,
+    };
+
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 14),
+        const SizedBox(width: 8),
+        Text('LIGHT: $label', style: AppTheme.mono(size: 10, color: color, weight: FontWeight.w700)),
+      ],
+    );
   }
 }
 

@@ -15,6 +15,9 @@ class ParkingController extends ChangeNotifier {
       List.generate(kTotalSlots, (i) => ParkingSlot.initial(i + 1));
 
   GateState gateState = GateState.unknown;
+  TrafficLightState lightState = TrafficLightState.unknown;
+  int? reportedAvailableCount;
+  int? reportedOccupiedCount;
   String lcdLine1 = 'SMART PARKING';
   String lcdLine2 = 'Waiting for data...';
   ParkingEvent? latestEvent;
@@ -40,6 +43,19 @@ class ParkingController extends ChangeNotifier {
   bool get isParkingFull =>
       lastValidUpdate != null && availableCount == 0 && unknownCount == 0;
 
+  TrafficLightState get effectiveLightState {
+    if (gateState == GateState.commandSent) {
+      return TrafficLightState.yellow;
+    }
+    if (lightState != TrafficLightState.unknown) {
+      return lightState;
+    }
+    if (lastValidUpdate == null) {
+      return TrafficLightState.unknown;
+    }
+    return availableCount == 0 ? TrafficLightState.red : TrafficLightState.green;
+  }
+
   /// Resets everything to "no live data yet" — called on disconnect so a
   /// stale snapshot is never shown as if it were current.
   void resetToUnknown() {
@@ -49,6 +65,9 @@ class ParkingController extends ChangeNotifier {
     _checkingTimeouts.clear();
     slots = List.generate(kTotalSlots, (i) => ParkingSlot.initial(i + 1));
     gateState = GateState.unknown;
+    lightState = TrafficLightState.unknown;
+    reportedAvailableCount = null;
+    reportedOccupiedCount = null;
     lcdLine1 = 'SMART PARKING';
     lcdLine2 = 'Disconnected';
     lastValidUpdate = null;
@@ -68,6 +87,15 @@ class ParkingController extends ChangeNotifier {
         _applySlotStatus(occupied);
       case GateMessage(open: final open):
         gateState = open ? GateState.open : GateState.closed;
+        _touchLastUpdate();
+      case LightMessage(state: final state):
+        lightState = state;
+        _touchLastUpdate();
+      case AvailableCountMessage(count: final count):
+        reportedAvailableCount = count;
+        _touchLastUpdate();
+      case OccupiedCountMessage(count: final count):
+        reportedOccupiedCount = count;
         _touchLastUpdate();
       case LcdLine1Message(text: final text):
         lcdLine1 = text;

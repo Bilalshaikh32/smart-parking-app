@@ -1,3 +1,5 @@
+import '../models/parking_state.dart';
+
 /// Buffers raw incoming Bluetooth text and splits it into complete
 /// newline-terminated lines. Bluetooth Classic sockets deliver bytes in
 /// arbitrary chunks — a chunk boundary is NOT guaranteed to line up with
@@ -61,6 +63,24 @@ class GateMessage extends ParsedMessage {
   const GateMessage(this.open);
 }
 
+/// "LIGHT:<GREEN|YELLOW|RED>"
+class LightMessage extends ParsedMessage {
+  final TrafficLightState state;
+  const LightMessage(this.state);
+}
+
+/// "AVAILABLE:<n>"
+class AvailableCountMessage extends ParsedMessage {
+  final int count;
+  const AvailableCountMessage(this.count);
+}
+
+/// "OCCUPIED:<n>"
+class OccupiedCountMessage extends ParsedMessage {
+  final int count;
+  const OccupiedCountMessage(this.count);
+}
+
 /// "L1:<text>"
 class LcdLine1Message extends ParsedMessage {
   final String text;
@@ -106,10 +126,42 @@ class ParkingProtocolParser {
 
     if (line == 'PONG') return const PongMessage();
 
+    if (line.startsWith('GATE:')) {
+      final value = line.substring(5).trim().toUpperCase();
+      if (value == 'OPEN') return const GateMessage(true);
+      if (value == 'CLOSED') return const GateMessage(false);
+      return UnknownMessage(rawLine);
+    }
+
     if (line.startsWith('G:')) {
       final value = line.substring(2).trim();
       if (value == '1') return const GateMessage(true);
       if (value == '0') return const GateMessage(false);
+      return UnknownMessage(rawLine);
+    }
+
+    if (line.startsWith('LIGHT:')) {
+      final value = line.substring(6).trim().toUpperCase();
+      switch (value) {
+        case 'GREEN':
+          return const LightMessage(TrafficLightState.green);
+        case 'YELLOW':
+          return const LightMessage(TrafficLightState.yellow);
+        case 'RED':
+          return const LightMessage(TrafficLightState.red);
+      }
+      return UnknownMessage(rawLine);
+    }
+
+    if (line.startsWith('AVAILABLE:')) {
+      final parsed = int.tryParse(line.substring(10).trim());
+      if (parsed != null) return AvailableCountMessage(parsed);
+      return UnknownMessage(rawLine);
+    }
+
+    if (line.startsWith('OCCUPIED:')) {
+      final parsed = int.tryParse(line.substring(9).trim());
+      if (parsed != null) return OccupiedCountMessage(parsed);
       return UnknownMessage(rawLine);
     }
 

@@ -221,6 +221,7 @@ class BluetoothController extends ChangeNotifier {
   }
 
   void _handleDisconnected() {
+    if (connectionState == BtConnectionState.disconnected) return;
     connectionState = BtConnectionState.disconnected;
     connectedDeviceName = null;
     connectedDeviceAddress = null;
@@ -231,8 +232,9 @@ class BluetoothController extends ChangeNotifier {
   }
 
   void _handleError(Object error) {
+    if (connectionState == BtConnectionState.error) return;
     connectionState = BtConnectionState.error;
-    errorMessage = 'Bluetooth connection was lost.';
+    errorMessage = 'Bluetooth connection was lost. ${error.toString()}';
     _log('Socket error: $error', 'ERR');
     onDisconnected?.call();
     notifyListeners();

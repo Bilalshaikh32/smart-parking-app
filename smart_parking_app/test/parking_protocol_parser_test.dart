@@ -107,6 +107,29 @@ void main() {
       expect(e.raw, 'SLOT2_CHECKING');
     });
 
+    test('10. available and occupied count packets', () {
+      final available = ParkingProtocolParser.parseLine('AVAILABLE:2') as AvailableCountMessage;
+      final occupied = ParkingProtocolParser.parseLine('OCCUPIED:2') as OccupiedCountMessage;
+      expect(available.count, 2);
+      expect(occupied.count, 2);
+    });
+
+    test('11. light packets parse correctly', () {
+      expect(ParkingProtocolParser.parseLine('LIGHT:GREEN'), isA<LightMessage>());
+      expect((ParkingProtocolParser.parseLine('LIGHT:GREEN') as LightMessage).state,
+          TrafficLightState.green);
+      expect((ParkingProtocolParser.parseLine('LIGHT:YELLOW') as LightMessage).state,
+          TrafficLightState.yellow);
+      expect((ParkingProtocolParser.parseLine('LIGHT:RED') as LightMessage).state,
+          TrafficLightState.red);
+    });
+
+    test('12. gate open/closed packets', () {
+      expect(ParkingProtocolParser.parseLine('GATE:OPEN'), isA<GateMessage>());
+      expect((ParkingProtocolParser.parseLine('GATE:OPEN') as GateMessage).open, true);
+      expect((ParkingProtocolParser.parseLine('GATE:CLOSED') as GateMessage).open, false);
+    });
+
     test('duplicate slot values in one packet: last one wins, does not crash', () {
       final msg = ParkingProtocolParser.parseLine('S1:0,S1:1') as SlotStatusMessage;
       expect(msg.occupied[1], true);

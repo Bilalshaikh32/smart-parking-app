@@ -7,6 +7,8 @@ enum BtConnectionState { disconnected, connecting, connected, error }
 /// real G: line or event from the Arduino.
 enum GateState { unknown, open, closed, commandSent }
 
+enum TrafficLightState { unknown, green, yellow, red }
+
 const int kTotalSlots = 4;
 const Duration kStaleDataThreshold = Duration(seconds: 8);
 const int kMaxEventLogEntries = 50;

@@ -112,6 +112,13 @@ bool outFlag = false;
 bool gateOpen = false;
 bool gateBusy = false;
 
+bool servoAttached = false;
+byte currentGateAngle = GATE_CLOSED_ANGLE;
+
+byte currentLightState = 255;
+
+char lcdLineCache[2][17] = {{0}, {0}};
+
 // Confirmed status of each slot
 bool slotOccupied[TOTAL_SLOTS] = {
   false,
@@ -152,23 +159,33 @@ void setup()
   bluetooth.begin(9600);
 
   // Original sensors
-  pinMode(IR_IN, INPUT);
-  pinMode(IR_OUT, INPUT);
+  pinMode(IR_IN, INPUT_PULLUP);
+  pinMode(IR_OUT, INPUT_PULLUP);
 
   // New slot sensors
   for (byte i = 0; i < TOTAL_SLOTS; i++)
   {
-    pinMode(slotPins[i], INPUT);
+    pinMode(slotPins[i], INPUT_PULLUP);
   }
+
+  // Give sensors time to stabilize before reading initial state
+  delay(50);
 
   // Traffic lights
   pinMode(RED_LED, OUTPUT);
   pinMode(YELLOW_LED, OUTPUT);
   pinMode(GREEN_LED, OUTPUT);
 
-  // Servo - same as original working code
+  setGreenLight();
+
+  // Servo - initialize closed then release torque
   gate.attach(SERVO_PIN);
+  servoAttached = true;
   gate.write(GATE_CLOSED_ANGLE);
+  currentGateAngle = GATE_CLOSED_ANGLE;
+  delay(500);
+  gate.detach();
+  servoAttached = false;
 
   // LCD - same as original working code
   lcd.init();
@@ -422,20 +439,51 @@ void handleExitSensor()
 // SERVO CONTROL - SAME 0 / 90 / 3000 ms BEHAVIOUR
 // ======================================================
 
+void attachServoIfNeeded()
+{
+  if (!servoAttached)
+  {
+    gate.attach(SERVO_PIN);
+    servoAttached = true;
+  }
+}
+
+void detachServoIfNeeded()
+{
+  if (servoAttached)
+  {
+    gate.detach();
+    servoAttached = false;
+  }
+}
+
+void moveGateTo(byte angle)
+{
+  if (currentGateAngle == angle)
+  {
+    return;
+  }
+
+  attachServoIfNeeded();
+  gate.write(angle);
+  currentGateAngle = angle;
+}
+
 void openGateForVehicle()
 {
-  gate.write(GATE_OPEN_ANGLE);
+  moveGateTo(GATE_OPEN_ANGLE);
   gateOpen = true;
   sendGateState();
 
   delay(GATE_OPEN_TIME);
 
-  gate.write(GATE_CLOSED_ANGLE);
+  moveGateTo(GATE_CLOSED_ANGLE);
   gateOpen = false;
   sendGateState();
 
-  // Give the servo some time to move toward closed position
+  // Give the servo time to complete closure, then release holding torque
   delay(500);
+  detachServoIfNeeded();
 }
 
 // ======================================================
@@ -461,41 +509,54 @@ int countAvailableSlots()
 // LCD
 // ======================================================
 
+void updateLcdRow(byte row, const char *text)
+{
+  if (strcmp(lcdLineCache[row], text) == 0)
+  {
+    return;
+  }
+
+  strncpy(lcdLineCache[row], text, sizeof(lcdLineCache[row]) - 1);
+  lcdLineCache[row][16] = '\0';
+
+  lcd.setCursor(0, row);
+  lcd.print(text);
+
+  byte len = strlen(text);
+  for (byte i = len; i < 16; i++)
+  {
+    lcd.print(' ');
+  }
+}
+
 void updateNormalDisplay()
 {
   available = countAvailableSlots();
 
-  lcd.clear();
-  lcd.setCursor(0, 0);
+  char line1[17];
+  char line2[17];
 
   if (available == 0)
   {
-    lcd.print("Parking FULL");
+    strcpy(line1, "Parking FULL");
   }
   else
   {
-    lcd.print("Available:");
-    lcd.print(available);
+    snprintf(line1, sizeof(line1), "Available:%d", available);
   }
 
-  lcd.setCursor(0, 1);
-  lcd.print("Free:");
-  lcd.print(available);
-  lcd.print("/");
-  lcd.print(TOTAL_SLOTS);
+  snprintf(line2, sizeof(line2), "Free:%d/%d", available, TOTAL_SLOTS);
+
+  updateLcdRow(0, line1);
+  updateLcdRow(1, line2);
 
   updateTrafficLights();
 }
 
 void showMessage(const char *line1, const char *line2)
 {
-  lcd.clear();
-
-  lcd.setCursor(0, 0);
-  lcd.print(line1);
-
-  lcd.setCursor(0, 1);
-  lcd.print(line2);
+  updateLcdRow(0, line1);
+  updateLcdRow(1, line2);
 }
 
 // ======================================================
@@ -504,23 +565,43 @@ void showMessage(const char *line1, const char *line2)
 
 void setRedLight()
 {
+  if (currentLightState == 0)
+  {
+    return;
+  }
+
   digitalWrite(RED_LED, HIGH);
   digitalWrite(YELLOW_LED, LOW);
   digitalWrite(GREEN_LED, LOW);
+  currentLightState = 0;
+  sendLightState();
 }
 
 void setYellowLight()
 {
+  if (currentLightState == 1)
+  {
+    return;
+  }
+
   digitalWrite(RED_LED, LOW);
   digitalWrite(YELLOW_LED, HIGH);
   digitalWrite(GREEN_LED, LOW);
+  currentLightState = 1;
 }
 
 void setGreenLight()
 {
+  if (currentLightState == 2)
+  {
+    return;
+  }
+
   digitalWrite(RED_LED, LOW);
   digitalWrite(YELLOW_LED, LOW);
   digitalWrite(GREEN_LED, HIGH);
+  currentLightState = 2;
+  sendLightState();
 }
 
 void updateTrafficLights()
@@ -576,9 +657,53 @@ void sendGateState()
 {
   bluetooth.print("G:");
   bluetooth.println(gateOpen ? 1 : 0);
+  bluetooth.print("GATE:");
+  bluetooth.println(gateOpen ? "OPEN" : "CLOSED");
 
   Serial.print("G:");
   Serial.println(gateOpen ? 1 : 0);
+  Serial.print("GATE:");
+  Serial.println(gateOpen ? "OPEN" : "CLOSED");
+}
+
+void sendLightState()
+{
+  bluetooth.print("LIGHT:");
+  switch (currentLightState)
+  {
+    case 0:
+      bluetooth.println("RED");
+      Serial.println("LIGHT:RED");
+      break;
+    case 1:
+      bluetooth.println("YELLOW");
+      Serial.println("LIGHT:YELLOW");
+      break;
+    case 2:
+      bluetooth.println("GREEN");
+      Serial.println("LIGHT:GREEN");
+      break;
+    default:
+      bluetooth.println("UNKNOWN");
+      Serial.println("LIGHT:UNKNOWN");
+      break;
+  }
+}
+
+void sendParkingCounts()
+{
+  available = countAvailableSlots();
+  int occupied = TOTAL_SLOTS - available;
+
+  bluetooth.print("AVAILABLE:");
+  bluetooth.println(available);
+  bluetooth.print("OCCUPIED:");
+  bluetooth.println(occupied);
+
+  Serial.print("AVAILABLE:");
+  Serial.println(available);
+  Serial.print("OCCUPIED:");
+  Serial.println(occupied);
 }
 
 void sendLcdStatus()
@@ -607,6 +732,8 @@ void sendCompleteStatus()
 {
   sendSlotStatus();
   sendGateState();
+  sendParkingCounts();
+  sendLightState();
   sendLcdStatus();
 }
 
@@ -722,8 +849,9 @@ void processBluetoothCommand(const char *command)
 
   else if (strcmp(command, "CLOSE") == 0)
   {
-    gate.write(GATE_CLOSED_ANGLE);
+    moveGateTo(GATE_CLOSED_ANGLE);
     gateOpen = false;
+    detachServoIfNeeded();
 
     sendEvent("MANUAL_CLOSE");
     sendGateState();

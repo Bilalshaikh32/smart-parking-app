@@ -159,8 +159,11 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                     total: parking.slots.length,
                     available: parking.availableCount,
                     occupied: parking.occupiedCount,
+                    reportedAvailable: parking.reportedAvailableCount,
+                    reportedOccupied: parking.reportedOccupiedCount,
                     isFull: parking.isParkingFull,
                     hasLiveData: parking.lastValidUpdate != null,
+                    lightState: parking.effectiveLightState,
                   ),
                   const SizedBox(height: 18),
                   GridView.count(
